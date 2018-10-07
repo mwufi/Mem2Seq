@@ -199,10 +199,10 @@ class Mem2Seq(nn.Module):
                     temp.append(src_plain[i][toppi.squeeze()[i]]) ## copy from the input
                 else:
                     ind = topvi.squeeze()[i]
-                    if ind == EOS_token:
+                    if ind.item() == EOS_token:
                         temp.append('<EOS>')
                     else:
-                        temp.append(self.lang.index2word[ind]) ## get from vocabulary
+                        temp.append(self.lang.index2word[ind.item()]) ## get from vocabulary
             decoded_words.append(temp)
 
         # Set back to training mode
