@@ -208,7 +208,7 @@ class Mem2Seq(nn.Module):
                     temp.append(p[i][toppi.squeeze()[i]])
                     from_which.append('p')
                 else:
-                    ind = topvi.squeeze()[i]
+                    ind = topvi.squeeze()[i].item()
                     if ind == EOS_token:
                         temp.append('<EOS>')
                     else:
