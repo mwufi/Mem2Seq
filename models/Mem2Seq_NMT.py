@@ -150,8 +150,8 @@ class Mem2Seq(nn.Module):
         loss.backward()
 
         # Clip gradient norms
-        ec = torch.nn.utils.clip_grad_norm(self.encoder.parameters(), clip)
-        dc = torch.nn.utils.clip_grad_norm(self.decoder.parameters(), clip)
+        ec = torch.nn.utils.clip_grad_norm_(self.encoder.parameters(), clip)
+        dc = torch.nn.utils.clip_grad_norm_(self.decoder.parameters(), clip)
         # Update parameters with optimizers
         self.encoder_optimizer.step()
         self.decoder_optimizer.step()
