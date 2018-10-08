@@ -129,7 +129,7 @@ class Mem2Seq(nn.Module):
                 all_decoder_outputs_ptr[t] = decoder_ptr
                 ## get the correspective word in input
                 top_ptr_i = torch.gather(input_batches[:,:,0],0,Variable(toppi.view(1, -1)))
-                next_in = [top_ptr_i.squeeze()[i].data[0] if(toppi.squeeze()[i] < input_lengths[i]-1) else topvi.squeeze()[i] for i in range(batch_size)]
+                next_in = [top_ptr_i.squeeze()[i].item() if(toppi.squeeze()[i] < input_lengths[i]-1) else topvi.squeeze()[i] for i in range(batch_size)]
                 decoder_input = Variable(torch.LongTensor(next_in)) # Chosen word is next input
                 if USE_CUDA: decoder_input = decoder_input.cuda()
 
@@ -154,9 +154,9 @@ class Mem2Seq(nn.Module):
         # Update parameters with optimizers
         self.encoder_optimizer.step()
         self.decoder_optimizer.step()
-        self.loss += loss.data[0]
-        self.loss_ptr += loss_Ptr.data[0]
-        self.loss_vac += loss_Vocab.data[0]
+        self.loss += loss.item()
+        self.loss_ptr += loss_Ptr.item()
+        self.loss_vac += loss_Vocab.item()
 
     def evaluate_batch(self,batch_size,input_batches, input_lengths, target_batches, target_lengths, target_index,target_gate,src_plain, conv_seqs, conv_lengths):
         # Set to not-training mode to disable dropout
@@ -196,7 +196,7 @@ class Mem2Seq(nn.Module):
             all_decoder_outputs_ptr[t] = decoder_ptr
             topp, toppi = decoder_ptr.data.topk(1)
             top_ptr_i = torch.gather(input_batches[:,:,0],0,Variable(toppi.view(1, -1)))
-            next_in = [top_ptr_i.squeeze()[i].data[0] if(toppi.squeeze()[i] < input_lengths[i]-1) else topvi.squeeze()[i] for i in range(batch_size)]
+            next_in = [top_ptr_i.squeeze()[i].item() if(toppi.squeeze()[i] < input_lengths[i]-1) else topvi.squeeze()[i] for i in range(batch_size)]
 
             decoder_input = Variable(torch.LongTensor(next_in)) # Chosen word is next input
             if USE_CUDA: decoder_input = decoder_input.cuda()
@@ -226,13 +226,13 @@ class Mem2Seq(nn.Module):
         # y_ptr_hat = torch.index_select(y_ptr_hat, 0, indices)
         # y_ptr = target_index
         # acc_ptr = y_ptr.eq(y_ptr_hat).sum()
-        # acc_ptr = acc_ptr.data[0]/(y_ptr_hat.size(0)*y_ptr_hat.size(1))
+        # acc_ptr = acc_ptr.item()/(y_ptr_hat.size(0)*y_ptr_hat.size(1))
         # ## acc vocab
         # y_vac_hat = all_decoder_outputs_vocab.topk(1)[1].squeeze()
         # y_vac_hat = torch.index_select(y_vac_hat, 0, indices)
         # y_vac = target_batches
         # acc_vac = y_vac.eq(y_vac_hat).sum()
-        # acc_vac = acc_vac.data[0]/(y_vac_hat.size(0)*y_vac_hat.size(1))
+        # acc_vac = acc_vac.item()/(y_vac_hat.size(0)*y_vac_hat.size(1))
 
         # Set back to training mode
         self.encoder.train(True)

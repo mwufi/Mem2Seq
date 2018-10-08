@@ -22,7 +22,7 @@ class VanillaSeqToSeq(nn.Module):
         self.output_size = lang.n_words
         self.hidden_size = hidden_size
         self.max_len = max_len ## max input
-        self.max_r = max_r ## max responce len   
+        self.max_r = max_r ## max responce len
         self.lang = lang
         self.lr = lr
         self.decoder_learning_ratio = 1.0
@@ -37,7 +37,7 @@ class VanillaSeqToSeq(nn.Module):
                 logging.info("MODEL {} LOADED".format(str(path)))
                 self.encoder = torch.load(str(path)+'/enc.th',lambda storage, loc: storage)
                 self.decoder = torch.load(str(path)+'/dec.th',lambda storage, loc: storage)
-                self.decoder.viz_arr =[] 
+                self.decoder.viz_arr =[]
         else:
             self.encoder = EncoderRNN(lang.n_words, hidden_size, n_layers,dropout)
             self.decoder = VanillaDecoderRNN(hidden_size, lang.n_words, self.max_len, n_layers, dropout)
@@ -45,7 +45,7 @@ class VanillaSeqToSeq(nn.Module):
         # Initialize optimizers and criterion
         self.encoder_optimizer = optim.Adam(self.encoder.parameters(), lr=lr)
         self.decoder_optimizer = optim.Adam(self.decoder.parameters(), lr=lr * self.decoder_learning_ratio)
-        
+
         self.loss = 0
         self.print_every = 1
         # Move models to GPU
@@ -61,22 +61,22 @@ class VanillaSeqToSeq(nn.Module):
     def save_model(self,dec_type):
         name_data = "KVR/" if self.task=='' else "BABI/"
         if USEKB:
-            directory = 'save/vanilla_KB-'+name_data+str(self.task)+'HDD'+str(self.hidden_size)+'DR'+str(self.dropout)+'L'+str(self.n_layers)+'lr'+str(self.lr)+str(dec_type)         
+            directory = 'save/vanilla_KB-'+name_data+str(self.task)+'HDD'+str(self.hidden_size)+'DR'+str(self.dropout)+'L'+str(self.n_layers)+'lr'+str(self.lr)+str(dec_type)
         else:
-            directory = 'save/vanilla_noKB-'+name_data+str(self.task)+'HDD'+str(self.hidden_size)+'DR'+str(self.dropout)+'L'+str(self.n_layers)+'lr'+str(self.lr)+str(dec_type)         
+            directory = 'save/vanilla_noKB-'+name_data+str(self.task)+'HDD'+str(self.hidden_size)+'DR'+str(self.dropout)+'L'+str(self.n_layers)+'lr'+str(self.lr)+str(dec_type)
         if not os.path.exists(directory):
             os.makedirs(directory)
         torch.save(self.encoder, directory+'/enc.th')
         torch.save(self.decoder, directory+'/dec.th')
-        
+
     def load_model(self,file_name_enc,file_name_dec):
         self.encoder = torch.load(file_name_enc)
         self.decoder = torch.load(file_name_dec)
 
 
-    def train_batch(self, input_batches, input_lengths, target_batches, 
+    def train_batch(self, input_batches, input_lengths, target_batches,
                     target_lengths, target_index, target_gate, batch_size, clip,
-                    teacher_forcing_ratio, reset):    
+                    teacher_forcing_ratio, reset):
         # Zero gradients of both optimizers
         if reset:
             self.loss = 0
@@ -88,7 +88,7 @@ class VanillaSeqToSeq(nn.Module):
         loss_Vocab,loss_Ptr,loss_Gate = 0,0,0
         # Run words through encoder
         encoder_outputs, encoder_hidden = self.encoder(input_batches, input_lengths)
-      
+
         # Prepare input and output variables
         decoder_input = Variable(torch.LongTensor([SOS_token] * batch_size))
         decoder_hidden = (encoder_hidden[0][:self.decoder.n_layers],encoder_hidden[1][:self.decoder.n_layers])
@@ -102,8 +102,8 @@ class VanillaSeqToSeq(nn.Module):
 
         # Choose whether to use teacher forcing
         use_teacher_forcing = random.random() < teacher_forcing_ratio
-        
-        if use_teacher_forcing:    
+
+        if use_teacher_forcing:
             # Run through decoder one time step at a time
             for t in range(max_target_length):
                 decoder_vacab, decoder_hidden = self.decoder(decoder_input, decoder_hidden, encoder_outputs)
@@ -111,7 +111,7 @@ class VanillaSeqToSeq(nn.Module):
                 all_decoder_outputs_vocab[t] = decoder_vacab
                 decoder_input = target_batches[t] # Next input is current target
                 if USE_CUDA: decoder_input = decoder_input.cuda()
-                
+
         else:
             for t in range(max_target_length):
                 decoder_vacab,decoder_hidden = self.decoder(decoder_input, decoder_hidden, encoder_outputs)
@@ -119,7 +119,7 @@ class VanillaSeqToSeq(nn.Module):
                 topv, topi = decoder_vacab.data.topk(1)
                 decoder_input = decoder_input = Variable(topi.view(-1)) # Chosen word is next input
                 if USE_CUDA: decoder_input = decoder_input.cuda()
-                  
+
         #Loss calculation and backpropagation
         loss_Vocab = masked_cross_entropy(
             all_decoder_outputs_vocab.transpose(0, 1).contiguous(), # -> batch x seq
@@ -129,24 +129,24 @@ class VanillaSeqToSeq(nn.Module):
 
         loss = loss_Vocab
         loss.backward()
-        
+
         # Clip gradient norms
-        ec = torch.nn.utils.clip_grad_norm(self.encoder.parameters(), clip)
-        dc = torch.nn.utils.clip_grad_norm(self.decoder.parameters(), clip)
+        ec = torch.nn.utils.clip_grad_norm_(self.encoder.parameters(), clip)
+        dc = torch.nn.utils.clip_grad_norm_(self.decoder.parameters(), clip)
         # Update parameters with optimizers
         self.encoder_optimizer.step()
         self.decoder_optimizer.step()
         # self.opt.step()
-        
-        self.loss += loss.data[0]
-        
+
+        self.loss += loss.item()
 
 
 
-    def evaluate_batch(self,batch_size,input_batches, input_lengths, target_batches):  
+
+    def evaluate_batch(self,batch_size,input_batches, input_lengths, target_batches):
         # Set to not-training mode to disable dropout
         self.encoder.train(False)
-        self.decoder.train(False)  
+        self.decoder.train(False)
         # Run words through encoder
         encoder_outputs, encoder_hidden = self.encoder(input_batches, input_lengths, None)
         # Prepare input and output variables
@@ -160,7 +160,7 @@ class VanillaSeqToSeq(nn.Module):
         if USE_CUDA:
             all_decoder_outputs_vocab = all_decoder_outputs_vocab.cuda()
             decoder_input = decoder_input.cuda()
-        
+
         # Run through decoder one time step at a time
         for t in range(self.max_r):
             decoder_vacab,decoder_hidden  = self.decoder(decoder_input, decoder_hidden, encoder_outputs)
@@ -168,7 +168,7 @@ class VanillaSeqToSeq(nn.Module):
             all_decoder_outputs_vocab[t] = decoder_vacab
             topv, topi = decoder_vacab.data.topk(1)
             decoder_input = Variable(topi.view(-1))
-    
+
             decoded_words.append(['<EOS>'if ni == EOS_token else self.lang.index2word[ni] for ni in topi.view(-1)])
             # Next input is chosen word
             if USE_CUDA: decoder_input = decoder_input.cuda()
@@ -176,7 +176,7 @@ class VanillaSeqToSeq(nn.Module):
         # Set back to training mode
         self.encoder.train(True)
         self.decoder.train(True)
-        
+
         return decoded_words
 
     def evaluate(self,dev,avg_best,BLEU=False):
@@ -193,8 +193,8 @@ class VanillaSeqToSeq(nn.Module):
         ref_s = ""
         hyp_s = ""
         pbar = tqdm(enumerate(dev),total=len(dev))
-        for j, data_dev in pbar: 
-            words = self.evaluate_batch(len(data_dev[1]),data_dev[0],data_dev[1],data_dev[2])             
+        for j, data_dev in pbar:
+            words = self.evaluate_batch(len(data_dev[1]),data_dev[0],data_dev[1],data_dev[2])
             acc=0
             w = 0
             temp_gen = []
@@ -207,8 +207,8 @@ class VanillaSeqToSeq(nn.Module):
                     else:
                         st+= e + ' '
                 temp_gen.append(st)
-                correct = data_dev[7][i]  
-                ### compute F1 SCORE  
+                correct = data_dev[7][i]
+                ### compute F1 SCORE
                 if(len(data_dev)>10):
                     f1_true,f1_pred = computeF1(data_dev[8][i],st.lstrip().rstrip(),correct.lstrip().rstrip())
                     microF1_TRUE += f1_true
@@ -216,16 +216,16 @@ class VanillaSeqToSeq(nn.Module):
 
                     f1_true,f1_pred = computeF1(data_dev[9][i],st.lstrip().rstrip(),correct.lstrip().rstrip())
                     microF1_TRUE_cal += f1_true
-                    microF1_PRED_cal += f1_pred 
+                    microF1_PRED_cal += f1_pred
 
                     f1_true,f1_pred = computeF1(data_dev[10][i],st.lstrip().rstrip(),correct.lstrip().rstrip())
                     microF1_TRUE_nav += f1_true
-                    microF1_PRED_nav += f1_pred 
+                    microF1_PRED_nav += f1_pred
 
-                    f1_true,f1_pred = computeF1(data_dev[11][i],st.lstrip().rstrip(),correct.lstrip().rstrip()) 
+                    f1_true,f1_pred = computeF1(data_dev[11][i],st.lstrip().rstrip(),correct.lstrip().rstrip())
                     microF1_TRUE_wet += f1_true
-                    microF1_PRED_wet += f1_pred  
-       
+                    microF1_PRED_wet += f1_pred
+
                 if (correct.lstrip().rstrip() == st.lstrip().rstrip()):
                     acc+=1
                 #else:
@@ -249,10 +249,10 @@ class VanillaSeqToSeq(nn.Module):
             logging.info("F1 WET:\t"+str(f1_score(microF1_TRUE_wet, microF1_PRED_wet, average='micro')))
             logging.info("F1 NAV:\t"+str(f1_score(microF1_TRUE_nav, microF1_PRED_nav, average='micro')))
 
-        if (BLEU):       
-            bleu_score = moses_multi_bleu(np.array(hyp), np.array(ref), lowercase=True) 
-            logging.info("BLEU SCORE:"+str(bleu_score))     
-                                                                      
+        if (BLEU):
+            bleu_score = moses_multi_bleu(np.array(hyp), np.array(ref), lowercase=True)
+            logging.info("BLEU SCORE:"+str(bleu_score))
+
             if (bleu_score >= avg_best):
                 self.save_model(str(self.name)+str(bleu_score))
                 logging.info("MODEL SAVED")
@@ -275,33 +275,33 @@ def computeF1(entity,st,correct):
 
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, hidden_size, n_layers=1, dropout=0.1):
-        super(EncoderRNN, self).__init__()      
+        super(EncoderRNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.n_layers = n_layers
-        self.dropout = dropout      
-        self.embedding_dropout = nn.Dropout(dropout) 
+        self.dropout = dropout
+        self.embedding_dropout = nn.Dropout(dropout)
         self.embedding = nn.Embedding(input_size, hidden_size)
         self.lstm = nn.LSTM(hidden_size, hidden_size, n_layers, dropout=self.dropout)
         if USE_CUDA:
-            self.lstm = self.lstm.cuda() 
+            self.lstm = self.lstm.cuda()
             self.embedding_dropout = self.embedding_dropout.cuda()
-            self.embedding = self.embedding.cuda() 
+            self.embedding = self.embedding.cuda()
 
     def get_state(self, input):
         """Get cell states and hidden states."""
         batch_size = input.size(1)
         h0_encoder = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size )) ### * self.num_directions = 2 if bi
-        c0_encoder = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size ))  
+        c0_encoder = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size ))
         if USE_CUDA:
             h0_encoder = h0_encoder.cuda()
-            c0_encoder = c0_encoder.cuda() 
+            c0_encoder = c0_encoder.cuda()
         return h0_encoder, c0_encoder
 
     def forward(self, input_seqs, input_lengths, hidden=None):
         # Note: we run this all at once (over multiple batches of multiple sequences)
         embedded = self.embedding(input_seqs)
-        embedded = self.embedding_dropout(embedded)        
+        embedded = self.embedding_dropout(embedded)
         h0_encoder, c0_encoder = self.get_state(input_seqs)
         if input_lengths:
             embedded = nn.utils.rnn.pack_padded_sequence(embedded, input_lengths, batch_first=False)
